@@ -12,6 +12,7 @@
 namespace Gush\Adapter;
 
 use Github\Client;
+use Github\Exception\ValidationFailedException;
 use Github\HttpClient\CachedHttpClient;
 use Github\ResultPager;
 use Gush\Config;
@@ -345,19 +346,34 @@ class GitHubAdapter extends BaseAdapter implements IssueTracker
     {
         $api = $this->client->api('pull_request');
 
-        return $api->create(
-            $this->getUsername(),
-            $this->getRepository(),
-            array_merge(
-                $parameters,
-                [
-                    'base' => $base,
-                    'head' => $head,
-                    'title' => $subject,
-                    'body' => $body,
-                ]
-            )
-        );
+        try {
+            $result = $api->create(
+                $this->getUsername(),
+                $this->getRepository(),
+                array_merge(
+                    $parameters,
+                    [
+                        'base' => $base,
+                        'head' => $head,
+                        'title' => $subject,
+                        'body' => $body,
+                    ]
+                )
+            );
+        } catch (ValidationFailedException $exception) {
+            if (isset($parameters['issue']) &&
+                'Validation Failed: Field "issue" is invalid, for resource "PullRequest"' === $exception->getMessage()
+            ) {
+                throw new \Exception(
+                    'Pull Request already opened for given issue '.
+                    $this->getPullRequestUrl($parameters['issue'])
+                );
+            }
+
+            throw $exception;
+        }
+
+        return $result;
     }
 
     /**
@@ -381,7 +397,7 @@ class GitHubAdapter extends BaseAdapter implements IssueTracker
      */
     public function getPullRequestUrl($id)
     {
-        return sprintf('https://%s/%s/%s/pull/%d', $this->domain, $this->getUsername(), $this->getRepository(), $id);
+        return sprintf('%s/%s/%s/pull/%d', $this->domain, $this->getUsername(), $this->getRepository(), $id);
     }
 
     /**
