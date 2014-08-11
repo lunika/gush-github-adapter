@@ -479,11 +479,10 @@ class GitHubAdapter extends BaseAdapter implements IssueTracker
         // FIXME is not respecting the pagination
 
         $api = $this->client->api('pull_request');
-        $state = ['state' => $state];
         $fetchedPrs = $api->all(
             $this->getUsername(),
             $this->getRepository(),
-            $state
+            ['state' => $state]
         );
 
         $prs = [];
